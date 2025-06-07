@@ -1,0 +1,6 @@
+services:
+  datapipeline:
+    image: datapipeline
+    build:
+      context: .
+      dockerfile: ./Dockerfile
