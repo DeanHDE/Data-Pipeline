@@ -1,0 +1,12 @@
+- repo: https://github.com/pre-commit/mirrors-prettier
+  rev: v3.2.5  # Use the latest stable version
+  hooks:
+    - id: prettier
+
+- repo: https://github.com/sqlfluff/sqlfluff
+  rev: 3.0.7  # Use the latest stable version
+  hooks:
+    - id: sqlfluff-lint
+      args: [--dialect=postgres]  # Set your SQL dialect (e.g., postgres, bigquery, etc.)
+    - id: sqlfluff-fix
+      args: [--dialect=postgres]

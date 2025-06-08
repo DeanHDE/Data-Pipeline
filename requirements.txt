@@ -1,3 +1,26 @@
-# To ensure app dependencies are ported from your virtual environment/host machine into your container, run 'pip freeze > requirements.txt' in the terminal to overwrite this file
 pandas
 numpy
+sqlalchemy
+psycopg2-binary         # PostgreSQL support
+pymysql                 # MySQL support
+pyarrow                 # Parquet/Arrow support
+fastparquet             # Parquet support
+openpyxl                # Excel file support
+requests                # HTTP requests
+boto3                   # AWS SDK
+google-cloud-storage    # Google Cloud Storage SDK
+azure-storage-blob      # Azure Blob Storage SDK
+pyyaml                  # YAML config support
+python-dotenv           # .env file support
+loguru                  # Logging
+jupyter                 # Jupyter notebooks
+plotly                  # Visualization
+pydantic                # Data validation and settings management
+kafka-python            # Apache Kafka client
+beautifulsoup4          # HTML/XML parsing
+apache-airflow          # Workflow orchestration
+flake8                  # Linting for style and errors
+black                   # Code formatter
+isort                   # Import sorting
+sqlfluff                # SQL linter and formatter
+pre-commit              # Framework for pre-commit hooks
