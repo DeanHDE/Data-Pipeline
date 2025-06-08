@@ -18,7 +18,6 @@ plotly                  # Visualization
 pydantic                # Data validation and settings management
 kafka-python            # Apache Kafka client
 beautifulsoup4          # HTML/XML parsing
-apache-airflow          # Workflow orchestration
 flake8                  # Linting for style and errors
 black                   # Code formatter
 isort                   # Import sorting
