@@ -1,7 +1,6 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
 FROM python:slim-bookworm
 
-
 # Keeps Python from generating .pyc files in the container
 ENV PYTHONDONTWRITEBYTECODE=1
 
@@ -15,6 +14,3 @@ RUN python3 -m pip install -r requirements.txt
 WORKDIR /app
 COPY . /app
 
-
-# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
-RUN ["python3", "main.py"]
