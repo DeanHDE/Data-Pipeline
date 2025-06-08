@@ -1,0 +1,14 @@
+{
+    "name": "Data Pipeline Dev Container",
+    "build": {
+        "dockerfile": "../Dockerfile"
+    },
+    "workspaceFolder": "/workspace",
+    "mounts": [
+        {
+            "source": ".",
+            "target": "/workspace",
+            "type": "bind"
+        }
+    ]
+}
