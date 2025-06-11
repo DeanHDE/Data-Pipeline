@@ -21,6 +21,25 @@ services:
       - "8080:8080"
     command: "version"
 
+  spark:
+    image: bitnami/spark:3.5.1
+    environment:
+      - SPARK_MODE=master
+    depends_on:
+      - airflow
+    ports:
+      - "8077:8077"  # Spark UI
+      - "7077:7077"  # Spark master port
+
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+    depends_on:
+      - spark
+
+
   datapipeline:
     image: datapipeline
     build:
@@ -30,6 +49,9 @@ services:
       - airflow
     ports:
       - "8000:8000"
+    environment:
+      - PYSPARK_PYTHON=python3
+      - PYSPARK_DRIVER_PYTHON=python3
     command: ["/bin/sh", "-c", "echo 'Container is running!'; while true; do sleep 1000; done"]
 
 volumes:
