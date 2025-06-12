@@ -1,6 +1,8 @@
-pandas
-numpy
-sqlalchemy
+pyspark==3.5.1          # Apache Spark for big data paraller processing   
+pandas                  # Data manipulation and analysis  
+polars                  # Fast DataFrame library
+adbc-driver-postgresql  # Polars engine
+sqlalchemy              # SQL toolkit and Object Relational Mapper
 psycopg2-binary         # PostgreSQL support
 pymysql                 # MySQL support
 pyarrow                 # Parquet/Arrow support
