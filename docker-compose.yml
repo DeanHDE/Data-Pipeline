@@ -1,6 +1,58 @@
 services:
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  airflow:
+    image: apache/airflow:3.0.1-python3.12
+    environment:
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    command: "version"
+
+  spark:
+    image: bitnami/spark:3.5.1
+    environment:
+      - SPARK_MODE=master
+    depends_on:
+      - airflow
+    ports:
+      - "8077:8077"  # Spark UI
+      - "7077:7077"  # Spark master port
+
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+    depends_on:
+      - spark
+
+
   datapipeline:
     image: datapipeline
     build:
       context: .
       dockerfile: ./Dockerfile
+    depends_on:
+      - airflow
+    ports:
+      - "8000:8000"
+    environment:
+      - PYSPARK_PYTHON=python3
+      - PYSPARK_DRIVER_PYTHON=python3
+    command: ["/bin/sh", "-c", "echo 'Container is running!'; while true; do sleep 1000; done"]
+
+volumes:
+  pgdata:

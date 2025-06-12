@@ -1,8 +1,9 @@
 {
     "name": "Data Pipeline Dev Container",
-    "build": {
-        "dockerfile": "../Dockerfile"
-    },
+    "dockerComposeFile": [
+        "../docker-compose.yml"
+    ],
+    "service": "datapipeline",
     "workspaceFolder": "/workspace",
     "mounts": [
         {
@@ -11,4 +12,5 @@
             "type": "bind"
         }
     ]
+ 
 }
