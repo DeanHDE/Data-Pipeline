@@ -102,5 +102,8 @@ class ExecuteQuery:
         """
         self._load_pg_tables_to_spark(tables)
         df = self.spark.sql(query)
+        print(f"Loaded {df.count()} rows")
+
         print(df)
         logger.info(df)
+        df.show()

@@ -22,7 +22,9 @@ services:
     command: "version"
 
   spark:
-    image: bitnami/spark:3.5.1
+    build:
+      context: .
+      dockerfile: ./Dockerfile.spark
     environment:
       - SPARK_MODE=master
     depends_on:
@@ -30,19 +32,16 @@ services:
     ports:
       - "8077:8077"  # Spark UI
       - "7077:7077"  # Spark master port
-    volumes:
-      - ./jars/postgresql-42.7.3.jar:/opt/bitnami/spark/jars/postgresql-42.7.3.jar
 
   spark-worker:
-    image: bitnami/spark:3.5.1
+    build:
+      context: .
+      dockerfile: ./Dockerfile.spark
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark:7077
     depends_on:
       - spark
-    volumes:
-      - ./jars/postgresql-42.7.3.jar:/opt/bitnami/spark/jars/postgresql-42.7.3.jar
-
 
   datapipeline:
     image: datapipeline
