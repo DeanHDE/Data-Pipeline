@@ -24,6 +24,9 @@ def run_queries():
         tables=["test"]
     )
 
+    sql.exec_select(query="SELECT * FROM test;")
+
+
     sql.exec_crud(query="DROP TABLE IF EXISTS test;") 
 
 

@@ -34,7 +34,7 @@ class ExecuteQuery:
         }
 
     @validate_call
-    def _jdbc_options(self, table:str):
+    def _jdbc_options(self, table: str) -> dict:
         return {
             "url": self.pg_jdbc_url,
             "dbtable": table,
@@ -54,7 +54,6 @@ class ExecuteQuery:
     def exec_select(self, query: str):
         conn = self.conn
         df = pl.read_database(query, connection=conn)
-        print (df) 
         logger.info(df)   
 
     # --- Spark versions below ---
@@ -90,10 +89,16 @@ class ExecuteQuery:
         """
         self._load_pg_tables_to_spark(tables)
         self.spark.sql(query)
+        df = self.spark.sql(f"SELECT * FROM {table_to_update}")
+        df.show()
         if update_flag:
-            # If update_flag is True, rewrite the DataFrame to the specified table
-            df = self.spark.table(table_to_update)
-            self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
+        # If update_flag is True, rewrite the DataFrame to the specified table
+            if mode == "overwrite":
+                self.exec_crud(f"DROP TABLE {table_to_update};")
+                mode = "append"
+                self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
+            else:
+                self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
 
     @validate_call
     def exec_select_spark(self, query: str, tables: List[str]):
