@@ -90,14 +90,20 @@ class ExecuteQuery:
         self._load_pg_tables_to_spark(tables)
         self.spark.sql(query)
         df = self.spark.sql(f"SELECT * FROM {table_to_update}")
-        df.show()
+        df = df.cache()
+        print('showing spark df')
         if update_flag:
         # If update_flag is True, rewrite the DataFrame to the specified table
             if mode == "overwrite":
-                self.exec_crud(f"DROP TABLE {table_to_update};")
                 mode = "append"
+                self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
                 self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
             else:
+                from pyspark.sql.functions import lit
+
+                df = df.withColumn('v', lit('spark'))
+                df = df.coalesce(1)
+
                 self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
 
     @validate_call
