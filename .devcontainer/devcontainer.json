@@ -1,16 +1,13 @@
 {
-    "name": "Data Pipeline Dev Container",
-    "dockerComposeFile": [
-        "../docker-compose.yml"
-    ],
-    "service": "datapipeline",
-    "workspaceFolder": "/workspace",
-    "mounts": [
-        {
-            "source": ".",
-            "target": "/workspace",
-            "type": "bind"
-        }
-    ]
- 
+  "name": "Data Pipeline Dev Container",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "datapipeline",
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    {
+      "source": ".",
+      "target": "/workspace",
+      "type": "bind"
+    }
+  ]
 }

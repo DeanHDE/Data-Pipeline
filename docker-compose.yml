@@ -1,5 +1,4 @@
 services:
-
   postgres:
     image: postgres:16
     environment:
@@ -30,8 +29,8 @@ services:
     depends_on:
       - airflow
     ports:
-      - "8077:8077"  # Spark UI
-      - "7077:7077"  # Spark master port
+      - "8077:8077" # Spark UI
+      - "7077:7077" # Spark master port
 
   spark-worker:
     build:
@@ -56,8 +55,12 @@ services:
       - PYSPARK_PYTHON=python3
       - PYSPARK_DRIVER_PYTHON=python3
       - SPARK_JARS=/opt/spark/jars/postgresql-42.7.3.jar
-    command: ["/bin/sh", "-c", "echo 'Container is running!'; while true; do sleep 1000; done"]
+    command:
+      [
+        "/bin/sh",
+        "-c",
+        "echo 'Container is running!'; while true; do sleep 1000; done",
+      ]
 
 volumes:
   pgdata:
-

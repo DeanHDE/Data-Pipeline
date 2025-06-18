@@ -5,12 +5,14 @@ import polars as pl
 from pyspark.sql import SparkSession
 from pydantic import validate_call
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-                    handlers=[
-                        logging.FileHandler("app.log"),
-                        logging.StreamHandler()  # This keeps logging to terminal as well
-                    ])
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[
+        logging.FileHandler("app.log"),
+        logging.StreamHandler(),  # This keeps logging to terminal as well
+    ],
+)
 logger = logging.getLogger(__name__)
 
 
@@ -19,24 +21,25 @@ class ExecuteQuery:
 
     def __init__(self):
         self.conn = psycopg2.connect(
-                            host="postgres",
-                            port=5432,
-                            user="postgres",
-                            password="postgres",
-                            dbname="postgres"
-                    )
-        self.spark = SparkSession.builder \
-                    .appName("PGSpark") \
-                    .master("spark://spark:7077") \
-                    .config("spark.jars", "/opt/spark/jars/postgresql-42.7.3.jar") \
-                    .getOrCreate()
-        
+            host="postgres",
+            port=5432,
+            user="postgres",
+            password="postgres",
+            dbname="postgres",
+        )
+        self.spark = (
+            SparkSession.builder.appName("PGSpark")
+            .master("spark://spark:7077")
+            .config("spark.jars", "/opt/spark/jars/postgresql-42.7.3.jar")
+            .getOrCreate()
+        )
+
         # JDBC config for PG
         self.pg_jdbc_url = "jdbc:postgresql://postgres:5432/postgres"
         self.pg_jdbc_props = {
             "user": "postgres",
             "password": "postgres",
-            "driver": "org.postgresql.Driver"
+            "driver": "org.postgresql.Driver",
         }
 
     @validate_call
@@ -62,7 +65,7 @@ class ExecuteQuery:
         conn = self.conn
         logger.info(f"SELECTING table from postgres directly using polars df: {query}")
         df = pl.read_database(query, connection=conn)
-        logger.info(df)   
+        logger.info(df)
 
     # --- Spark versions below ---
 
@@ -73,7 +76,11 @@ class ExecuteQuery:
         """
         for table in tables:
             try:
-                df = self.spark.read.format("jdbc").options(**self._jdbc_options(table)).load()
+                df = (
+                    self.spark.read.format("jdbc")
+                    .options(**self._jdbc_options(table))
+                    .load()
+                )
                 df.createOrReplaceTempView(table)
             except Exception as e:
                 logger.info(f"Failed to load table '{table}': {e}")
@@ -85,34 +92,41 @@ class ExecuteQuery:
         Write a single Spark DataFrame to a PostgreSQL table using JDBC.
         mode: "append", "overwrite", "ignore", or "error"
         """
-        df.write.format("jdbc") \
-            .options(**self._jdbc_options(table)) \
-            .mode(mode) \
-            .save()
+        df.write.format("jdbc").options(**self._jdbc_options(table)).mode(mode).save()
 
     @validate_call
-    def exec_crud_spark(self, query: str, tables: List[str], update_flag: bool, table_to_update: str ,mode: str):
+    def exec_crud_spark(
+        self,
+        query: str,
+        tables: List[str],
+        update_flag: bool,
+        table_to_update: str,
+        mode: str,
+    ):
         """
         Execute a SQL statement INSERT using Spark SQL.
         """
         if not query.lower().strip().startswith("insert"):
-            logger.info("Only INSERT allowed in SPARK CRUD operations. Attempted: " + query)
+            logger.info(
+                "Only INSERT allowed in SPARK CRUD operations. Attempted: " + query
+            )
             raise AssertionError("Only INSERT allowed in SPARK CRUD operations.")
-        
+
         self._load_pg_tables_to_spark(tables)
         self.spark.sql(query)
         df = self.spark.sql(f"SELECT * FROM {table_to_update}")
         df.cache()
-        df.count() # force caching with action
+        df.count()  # force caching with action
         if update_flag:
-            logger.info("Running INSERT operation in SPARK on table: " + table_to_update)
+            logger.info(
+                "Running INSERT operation in SPARK on table: " + table_to_update
+            )
             # If update_flag is True, rewrite the DataFrame to the specified table
             if mode == "overwrite":
                 mode = "append"
                 self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
                 self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
 
-            
     @validate_call
     def exec_select_spark(self, query: str, tables: List[str]):
         """
