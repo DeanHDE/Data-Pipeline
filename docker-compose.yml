@@ -10,7 +10,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  airflow:
+  airflow-webserver:
     image: apache/airflow:3.0.1-python3.12
     environment:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
@@ -18,7 +18,23 @@ services:
       - postgres
     ports:
       - "8080:8080"
-    command: "version"
+    restart: always # <--- ensures it stays up
+    entrypoint: /usr/bin/dumb-init -- airflow webserver
+    command: version
+    volumes:
+      - ./sql_scripts:/opt/airflow/sql_scripts
+      - ./airflow:/opt/airflow/airflow_scripts
+
+  airflow-scheduler:
+    image: apache/airflow:3.0.1-python3.12
+    environment:
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    depends_on:
+      - airflow-webserver
+    ports:
+      - "8081:8081"
+    restart: always # <--- ensures it stays up
+    entrypoint: /usr/bin/dumb-init -- airflow api-server
 
   spark:
     build:
@@ -27,7 +43,7 @@ services:
     environment:
       - SPARK_MODE=master
     depends_on:
-      - airflow
+      - airflow-scheduler
     ports:
       - "8077:8077" # Spark UI
       - "7077:7077" # Spark master port
@@ -48,7 +64,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
     depends_on:
-      - airflow
+      - spark-worker
     ports:
       - "8000:8000"
     environment:
