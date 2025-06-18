@@ -1,4 +1,3 @@
-print('hello world')
 from src.utils import ExecuteQuery
 
 sql = ExecuteQuery()
@@ -18,12 +17,39 @@ def run_queries():
         mode="append"
     )
 
+
+
     # Spark: Select to verify update
     sql.exec_select_spark(
         query="SELECT * FROM test",
         tables=["test"]
     )    
+
     sql.exec_select(query="SELECT * FROM test;")
+
+    sql.exec_crud_spark(
+        query="INSERT INTO test VALUES (3, 'spark_row_2', 'spark');",#"DELETE FROM test WHERE id = 1;",
+        tables=["test"],
+        update_flag=True,
+        table_to_update="test",
+        mode="overwrite"
+    )
+
+
+    sql.exec_select(query="SELECT * FROM test;")
+
+
+    sql.exec_crud_spark(
+        query="CREATE TABLE test2 AS SELECT 10 id, 'spark_ctas_1' as new_row;",
+        tables=["test2"],
+        update_flag=True,
+        table_to_update="test2",
+        mode="overwrite"
+    )
+
+    #sql.exec_select(query="SELECT * FROM test2;")
+
+
 
 
     sql.exec_crud(query="DROP TABLE IF EXISTS test;") 
@@ -31,5 +57,4 @@ def run_queries():
 
 
 if __name__ == '__main__':
-    print('This is the main module.')   
     run_queries()
