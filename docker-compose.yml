@@ -22,7 +22,9 @@ services:
     command: "version"
 
   spark:
-    image: bitnami/spark:3.5.1
+    build:
+      context: .
+      dockerfile: ./Dockerfile.spark
     environment:
       - SPARK_MODE=master
     depends_on:
@@ -32,13 +34,14 @@ services:
       - "7077:7077"  # Spark master port
 
   spark-worker:
-    image: bitnami/spark:3.5.1
+    build:
+      context: .
+      dockerfile: ./Dockerfile.spark
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark:7077
     depends_on:
       - spark
-
 
   datapipeline:
     image: datapipeline
@@ -52,7 +55,9 @@ services:
     environment:
       - PYSPARK_PYTHON=python3
       - PYSPARK_DRIVER_PYTHON=python3
+      - SPARK_JARS=/opt/spark/jars/postgresql-42.7.3.jar
     command: ["/bin/sh", "-c", "echo 'Container is running!'; while true; do sleep 1000; done"]
 
 volumes:
   pgdata:
+

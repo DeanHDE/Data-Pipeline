@@ -1,1 +1,60 @@
-print('hello world')
+from src.utils import ExecuteQuery
+
+sql = ExecuteQuery()
+
+def run_queries():
+    sql.exec_crud(query="DROP TABLE IF EXISTS test;") 
+    sql.exec_crud(query="CREATE TABLE test (id INT, name VARCHAR(100), v varchar(100));")
+    sql.exec_crud(query="INSERT INTO test (id, name , v) VALUES (1,'test_name', 'pg');")
+    sql.exec_select(query="SELECT * FROM test;")
+
+    # Spark: Insert a new row
+    sql.exec_crud_spark(
+        query="INSERT INTO test VALUES (2, 'spark_row_1', 'spark');",
+        tables=["test"],
+        update_flag=True,
+        table_to_update="test",
+        mode="append"
+    )
+
+
+
+    # Spark: Select to verify update
+    sql.exec_select_spark(
+        query="SELECT * FROM test",
+        tables=["test"]
+    )    
+
+    sql.exec_select(query="SELECT * FROM test;")
+
+    sql.exec_crud_spark(
+        query="INSERT INTO test VALUES (3, 'spark_row_2', 'spark');",#"DELETE FROM test WHERE id = 1;",
+        tables=["test"],
+        update_flag=True,
+        table_to_update="test",
+        mode="overwrite"
+    )
+
+
+    sql.exec_select(query="SELECT * FROM test;")
+
+
+    sql.exec_crud_spark(
+        query="CREATE TABLE test2 AS SELECT 10 id, 'spark_ctas_1' as new_row;",
+        tables=["test2"],
+        update_flag=True,
+        table_to_update="test2",
+        mode="overwrite"
+    )
+
+    #sql.exec_select(query="SELECT * FROM test2;")
+
+
+
+
+    sql.exec_crud(query="DROP TABLE IF EXISTS test;") 
+
+
+
+if __name__ == '__main__':
+    run_queries()
