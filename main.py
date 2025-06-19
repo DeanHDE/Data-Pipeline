@@ -33,18 +33,6 @@ def run_queries():
         mode="overwrite",
     )
 
-    sql.exec_select(query="SELECT * FROM test;")
-
-    sql.exec_crud_spark(
-        query="CREATE TABLE test2 AS SELECT 10 id, 'spark_ctas_1' as new_row;",
-        tables=["test2"],
-        update_flag=True,
-        table_to_update="test2",
-        mode="overwrite",
-    )
-
-    # sql.exec_select(query="SELECT * FROM test2;")
-
     sql.exec_crud(query="DROP TABLE IF EXISTS test;")
 
 

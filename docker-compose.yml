@@ -2,9 +2,9 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -13,14 +13,21 @@ services:
   airflow-webserver:
     image: apache/airflow:3.0.1-python3.12
     environment:
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       - postgres
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow db migrate && \
+      airflow api-server 
+      "
+
     ports:
       - "8080:8080"
-    restart: always # <--- ensures it stays up
-    entrypoint: /usr/bin/dumb-init -- airflow webserver
-    command: version
+
+    restart: on-failure
+
     volumes:
       - ./sql_scripts:/opt/airflow/sql_scripts
       - ./airflow:/opt/airflow/airflow_scripts
@@ -28,13 +35,16 @@ services:
   airflow-scheduler:
     image: apache/airflow:3.0.1-python3.12
     environment:
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       - airflow-webserver
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow scheduler
+      "
     ports:
       - "8081:8081"
-    restart: always # <--- ensures it stays up
-    entrypoint: /usr/bin/dumb-init -- airflow api-server
 
   spark:
     build:

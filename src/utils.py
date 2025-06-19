@@ -1,9 +1,39 @@
+import os
+from dotenv import load_dotenv
 import psycopg2
 from typing import List
 import logging
 import polars as pl
 from pyspark.sql import SparkSession
 from pydantic import validate_call
+
+load_dotenv()
+
+
+def check_env_vars() -> None:
+    """Check if the required environment variables for PostgreSQL are set."""
+
+    REQUIRED = {"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"}
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    env_path = os.path.abspath(env_path)
+
+    if not os.path.isfile(env_path):
+        logger.info(f"❌ .env file not found at {env_path}")
+        return
+
+    with open(env_path) as f:
+        content = f.read()
+
+    found = {
+        line.split("=")[0].strip()
+        for line in content.splitlines()
+        if "=" in line and not line.strip().startswith("#")
+    }
+    missing = REQUIRED - found
+
+    if missing:
+        return
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,16 +46,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+pg_user = os.environ.get("POSTGRES_USER")
+print(f"Postgres user: {pg_user}")
+pg_password = os.environ.get("POSTGRES_PASSWORD")
+pg_database = os.environ.get("POSTGRES_DB")
+
+
 class ExecuteQuery:
     """A class to execute a SQL query using psycopg2 and return the results."""
+
+    check_env_vars()
 
     def __init__(self):
         self.conn = psycopg2.connect(
             host="postgres",
             port=5432,
-            user="postgres",
-            password="postgres",
-            dbname="postgres",
+            user=pg_user,
+            password=pg_password,
+            dbname=pg_database,
         )
         self.spark = (
             SparkSession.builder.appName("PGSpark")
@@ -37,8 +75,8 @@ class ExecuteQuery:
         # JDBC config for PG
         self.pg_jdbc_url = "jdbc:postgresql://postgres:5432/postgres"
         self.pg_jdbc_props = {
-            "user": "postgres",
-            "password": "postgres",
+            "user": pg_user,
+            "password": pg_password,
             "driver": "org.postgresql.Driver",
         }
 
