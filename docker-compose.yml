@@ -14,13 +14,19 @@ services:
     image: apache/airflow:3.0.1-python3.12
     environment:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__AUTH_MANAGER: "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager"
+      AIRFLOW__WEBSERVER__ENABLE_USER_REGISTRATION: "True"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/simple_auth_manager_passwords.json"
+
     depends_on:
       - postgres
     entrypoint: /bin/bash
     command: >
       -c "
       airflow db migrate && \
-      airflow api-server 
+      mkdir -p /opt/airflow && \
+      echo '{\"admin\": \"'${POSTGRES_PASSWORD}'\"}' > /opt/airflow/simple_auth_manager_passwords.json && \
+      airflow api-server
       "
 
     ports:
@@ -36,6 +42,7 @@ services:
     image: apache/airflow:3.0.1-python3.12
     environment:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
     depends_on:
       - airflow-webserver
     entrypoint: /bin/bash
