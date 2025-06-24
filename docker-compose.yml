@@ -13,7 +13,7 @@ services:
   airflow-webserver:
     image: apache/airflow:3.0.1-python3.12
     environment:
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__AUTH_MANAGER: "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager"
       AIRFLOW__WEBSERVER__ENABLE_USER_REGISTRATION: "True"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/simple_auth_manager_passwords.json"
@@ -33,25 +33,72 @@ services:
       - "8080:8080"
 
     restart: on-failure
-
     volumes:
-      - ./sql_scripts:/opt/airflow/sql_scripts
-      - ./airflow:/opt/airflow/airflow_scripts
+      - ./airflow_scripts/dags:/opt/airflow/dags
+      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
+      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
 
   airflow-scheduler:
     image: apache/airflow:3.0.1-python3.12
     environment:
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 
     depends_on:
       - airflow-webserver
     entrypoint: /bin/bash
     command: >
       -c "
+      airflow db migrate && \
       airflow scheduler
       "
     ports:
       - "8081:8081"
+    volumes:
+      - ./airflow_scripts/dags:/opt/airflow/dags
+      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
+      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
+
+  airflow-dag-processor:
+    image: apache/airflow:3.0.1-python3.12
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+    depends_on:
+      - airflow-scheduler
+      - airflow-webserver
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow dag-processor
+      "
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./airflow_scripts/dags:/opt/airflow/dags
+      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
+      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
+
+  airflow-triggerer:
+    image: apache/airflow:3.0.1-python3.12
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+    depends_on:
+      - airflow-scheduler
+      - airflow-webserver
+      - airflow-dag-processor
+
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow triggerer
+      "
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./airflow_scripts/dags:/opt/airflow/dags
+      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
+      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
 
   spark:
     build:
@@ -60,7 +107,7 @@ services:
     environment:
       - SPARK_MODE=master
     depends_on:
-      - airflow-scheduler
+      - airflow-triggerer
     ports:
       - "8077:8077" # Spark UI
       - "7077:7077" # Spark master port
