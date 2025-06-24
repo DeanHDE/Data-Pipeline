@@ -25,3 +25,4 @@ black                   # Code formatter
 isort                   # Import sorting
 sqlfluff                # SQL linter and formatter
 pre-commit              # Framework for pre-commit hooks
+python-dotenv           # For loading environment
