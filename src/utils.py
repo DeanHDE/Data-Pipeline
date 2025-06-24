@@ -14,37 +14,6 @@ from src.settings import get_sql_queries_dir
 load_dotenv()
 
 
-def remote_or_local(api_endpoint=None):
-    """
-    Decorator to run the method locally if IS_MAIN_CONTAINER is true,
-    otherwise send the call to the remote API.
-    """
-
-    def decorator(func):
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            is_main = os.environ.get("IS_MAIN_CONTAINER", "false").lower() == "true"
-            if is_main:
-                logger.info("Running on MAIN container, executing locally.")
-                return func(self, *args, **kwargs)
-            else:
-                endpoint = api_endpoint or func.__name__
-                url = f"http://datapipeline:8000/{endpoint}"
-                payload = {"args": args, "kwargs": kwargs}
-                try:
-                    response = requests.post(url, json=payload)
-                    response.raise_for_status()
-                    logger.info("Calling main container, executing remotely.")
-                    return response.json()
-                except Exception as e:
-                    logger.error(f"Remote API call failed: {e}")
-                    raise
-
-        return wrapper
-
-    return decorator
-
-
 def check_env_vars() -> None:
     """Check if the required environment variables for PostgreSQL are set."""
 
@@ -114,7 +83,6 @@ class ExecuteQuery:
             "driver": "org.postgresql.Driver",
         }
 
-    @remote_or_local()
     @validate_call
     def _jdbc_options(self, table: str) -> dict:
         return {
@@ -125,7 +93,6 @@ class ExecuteQuery:
             "driver": self.pg_jdbc_props["driver"],
         }
 
-    @remote_or_local()
     @validate_call
     def exec_crud(self, query: str):
         conn = self.conn
@@ -134,7 +101,6 @@ class ExecuteQuery:
             cur.execute(query)
             conn.commit()
 
-    @remote_or_local()
     @validate_call
     def exec_select(self, query: str):
         conn = self.conn
@@ -144,7 +110,6 @@ class ExecuteQuery:
 
     # --- Spark versions below ---
 
-    @remote_or_local()
     @validate_call
     def _load_pg_tables_to_spark(self, tables: List[str]):
         """
@@ -162,7 +127,6 @@ class ExecuteQuery:
                 logger.info(f"Failed to load table '{table}': {e}")
                 raise
 
-    @remote_or_local()
     @validate_call
     def write_spark_df_to_pg(self, df, table: str, mode: str):
         """
@@ -171,7 +135,6 @@ class ExecuteQuery:
         """
         df.write.format("jdbc").options(**self._jdbc_options(table)).mode(mode).save()
 
-    @remote_or_local()
     @validate_call
     def exec_crud_spark(
         self,
@@ -205,7 +168,6 @@ class ExecuteQuery:
                 self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
                 self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
 
-    @remote_or_local()
     @validate_call
     def exec_select_spark(self, query: str, tables: List[str]):
         """
@@ -216,7 +178,7 @@ class ExecuteQuery:
         logger.info(f"Loaded {df.count()} rows from SPARK:")
         df.show()
 
-    def run_queries_from_plan(query_plan):
+    def run_queries_from_plan(self, query_plan: list):
         """
         query_plan: List of dicts, each with:
         - "function": name of ExecuteQuery method to call (str)
@@ -225,6 +187,7 @@ class ExecuteQuery:
         """
         sql = ExecuteQuery()
         sql_queries_dir = get_sql_queries_dir()
+        print(f"SQL queries directory: {sql_queries_dir}")
 
         for step in query_plan:
             func_name = step["function"]

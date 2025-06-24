@@ -11,12 +11,16 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   airflow-webserver:
-    image: apache/airflow:3.0.1-python3.12
+    build:
+      context: .
+      dockerfile: ./Dockerfile.airflow
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__AUTH_MANAGER: "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager"
       AIRFLOW__WEBSERVER__ENABLE_USER_REGISTRATION: "True"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/simple_auth_manager_passwords.json"
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - postgres
@@ -34,14 +38,16 @@ services:
 
     restart: on-failure
     volumes:
-      - ./airflow_scripts/dags:/opt/airflow/dags
-      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
-      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
+      - .:/opt/airflow
 
   airflow-scheduler:
-    image: apache/airflow:3.0.1-python3.12
+    build:
+      context: .
+      dockerfile: ./Dockerfile.airflow
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - airflow-webserver
@@ -54,18 +60,21 @@ services:
     ports:
       - "8081:8081"
     volumes:
-      - ./airflow_scripts/dags:/opt/airflow/dags
-      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
-      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
+      - .:/opt/airflow
 
   airflow-dag-processor:
-    image: apache/airflow:3.0.1-python3.12
+    build:
+      context: .
+      dockerfile: ./Dockerfile.airflow
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - airflow-scheduler
       - airflow-webserver
+
     entrypoint: /bin/bash
     command: >
       -c "
@@ -74,14 +83,16 @@ services:
     ports:
       - "8082:8082"
     volumes:
-      - ./airflow_scripts/dags:/opt/airflow/dags
-      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
-      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
+      - .:/opt/airflow
 
   airflow-triggerer:
-    image: apache/airflow:3.0.1-python3.12
+    build:
+      context: .
+      dockerfile: ./Dockerfile.airflow
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - airflow-scheduler
@@ -96,9 +107,7 @@ services:
     ports:
       - "8083:8083"
     volumes:
-      - ./airflow_scripts/dags:/opt/airflow/dags
-      - ./airflow_scripts/sql_queries:/opt/airflow/sql_scripts
-      - ./airflow_scripts/py_scripts:/opt/airflow/py_scripts
+      - .:/opt/airflow
 
   spark:
     build:

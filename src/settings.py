@@ -8,7 +8,7 @@ def get_sql_queries_dir():
     - Otherwise, use the local (host/dev) path.
     """
     return os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "airflow_scripts", "sql_queries")
+        os.path.join(os.path.dirname(__file__), "..", "dags", "sql_queries")
     )
 
 
