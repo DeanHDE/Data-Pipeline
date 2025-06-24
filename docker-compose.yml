@@ -135,6 +135,7 @@ services:
       - PYSPARK_PYTHON=python3
       - PYSPARK_DRIVER_PYTHON=python3
       - SPARK_JARS=/opt/spark/jars/postgresql-42.7.3.jar
+      - IS_MAIN_CONTAINER=true
     command:
       [
         "/bin/sh",
