@@ -1,11 +1,15 @@
 import os
-from dotenv import load_dotenv
+import requests
 import psycopg2
-from typing import List
 import logging
 import polars as pl
+from typing import List
+from dotenv import load_dotenv
+from functools import wraps
 from pyspark.sql import SparkSession
 from pydantic import validate_call
+from src.settings import get_sql_queries_dir
+
 
 load_dotenv()
 
@@ -18,7 +22,7 @@ def check_env_vars() -> None:
     env_path = os.path.abspath(env_path)
 
     if not os.path.isfile(env_path):
-        logger.info(f"❌ .env file not found at {env_path}")
+        logger.info(f"❌ .env file not found at {env_path} or variables not set.")
         return
 
     with open(env_path) as f:
@@ -47,7 +51,6 @@ logger = logging.getLogger(__name__)
 
 
 pg_user = os.environ.get("POSTGRES_USER")
-print(f"Postgres user: {pg_user}")
 pg_password = os.environ.get("POSTGRES_PASSWORD")
 pg_database = os.environ.get("POSTGRES_DB")
 
@@ -174,3 +177,29 @@ class ExecuteQuery:
         df = self.spark.sql(query)
         logger.info(f"Loaded {df.count()} rows from SPARK:")
         df.show()
+
+    def run_queries_from_plan(self, query_plan: list):
+        """
+        query_plan: List of dicts, each with:
+        - "function": name of ExecuteQuery method to call (str)
+        - "query": SQL filename (str) or SQL string
+        - ...other kwargs for the method (optional)
+        """
+        sql = ExecuteQuery()
+        sql_queries_dir = get_sql_queries_dir()
+        print(f"SQL queries directory: {sql_queries_dir}")
+
+        for step in query_plan:
+            func_name = step["function"]
+            query = step["query"]
+            # If query is a filename, load its contents
+            if (
+                isinstance(query, str)
+                and query.endswith(".sql")
+                and os.path.isfile(os.path.join(sql_queries_dir, query))
+            ):
+                with open(os.path.join(sql_queries_dir, query)) as f:
+                    query = f.read()
+            kwargs = {k: v for k, v in step.items() if k not in ("function", "query")}
+            func = getattr(sql, func_name)
+            func(query=query, **kwargs)
