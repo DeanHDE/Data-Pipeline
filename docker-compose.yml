@@ -20,7 +20,6 @@ services:
       AIRFLOW__WEBSERVER__ENABLE_USER_REGISTRATION: "True"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/simple_auth_manager_passwords.json"
       PYTHONPATH: /opt/airflow
-      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - postgres
@@ -47,7 +46,6 @@ services:
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PYTHONPATH: /opt/airflow
-      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - airflow-webserver
@@ -69,7 +67,6 @@ services:
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PYTHONPATH: /opt/airflow
-      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - airflow-scheduler
@@ -92,7 +89,6 @@ services:
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PYTHONPATH: /opt/airflow
-      AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
 
     depends_on:
       - airflow-scheduler
