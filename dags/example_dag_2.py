@@ -1,5 +1,5 @@
 from airflow.sdk import DAG
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 from datetime import datetime
 import sys
 import os
@@ -39,6 +39,8 @@ QUERY_PLAN_INSERT = [
     },
 ]
 
+logger.info("registering functions")
+
 
 def run_create():
     logger.info("Starting run_create")
@@ -56,6 +58,8 @@ def run_insert():
     logger.info("Finished run_insert")
 
 
+logger.info("DAG setup complete, starting to define tasks")
+
 with DAG(
     dag_id="example_exec_queries_dag",
     start_date=datetime(2024, 1, 1),
@@ -71,5 +75,7 @@ with DAG(
         task_id="insert_data",
         python_callable=run_insert,
     )
+
+    logger.info("Running tasks")
 
     t_create >> t_insert
