@@ -196,3 +196,4 @@ cython_debug/
 .github/
 
 /logs/
+simple_auth_manager_passwords.json
