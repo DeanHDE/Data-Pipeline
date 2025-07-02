@@ -17,7 +17,12 @@ load_dotenv()
 def check_env_vars() -> None:
     """Check if the required environment variables for PostgreSQL are set."""
 
-    REQUIRED = {"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"}
+    REQUIRED = {
+        "POSTGRES_USER",
+        "POSTGRES_PASSWORD",
+        "POSTGRES_DB",
+        "AIRFLOW__API__SECRET_KEY",
+    }
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     env_path = os.path.abspath(env_path)
 

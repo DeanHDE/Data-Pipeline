@@ -50,6 +50,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+*.err
+*.out
 
 # Translations
 *.mo
@@ -196,4 +198,4 @@ cython_debug/
 .github/
 
 /logs/
-simple_auth_manager_passwords.json
+simple_auth_manager_passwords.json*
