@@ -1,4 +1,5 @@
-pyspark==3.5.1          # Apache Spark for big data paraller processing   
+pyspark==3.5.1          # Apache Spark for big data paraller processing 
+apache-airflow-providers-apache-spark   # Airflow provider for Spark  
 pandas                  # Data manipulation and analysis  
 polars                  # Fast DataFrame library
 adbc-driver-postgresql  # Polars engine

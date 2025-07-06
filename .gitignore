@@ -199,6 +199,7 @@ cython_debug/
 .cursorindexingignore
 
 .github/
+.DSStore
 
 /logs/
 simple_auth_manager_passwords.json*

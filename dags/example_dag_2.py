@@ -1,66 +1,38 @@
 from airflow import DAG
-from airflow.providers.standard.operators.python import PythonOperator
-from airflow.operators.bash import BashOperator
+from airflow.providers.apache.spark.operators import SparkSubmitOperator
+from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-import sys
-import os
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # This keeps logging to terminal as well
-    ],
-)
-logger = logging.getLogger(__name__)
-
-
-logger.info("Starting to import sys and os")
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-print("Added parent directory to sys.path")
 from src.utils import ExecuteQuery
 
-logger.info("Starting to import ExecuteQuery from src.utils")
-
-QUERY_PLAN_CREATE = [
-    {
-        "function": "exec_crud",
-        "query": "example_query_3.sql",
-    },
-]
-
-QUERY_PLAN_INSERT = [
-    {
-        "function": "exec_crud_spark",
-        "query": "example_query_4.sql",
-        "tables": ["test"],
-        "update_flag": True,
-        "table_to_update": "test",
-        "mode": "append",
-    },
-]
-
-logger.info("registering functions")
+default_args = {
+    "owner": "airflow",
+    "retries": 1,
+    "retry_delay": timedelta(minutes=5),
+}
 
 
-def run_create():
-    logger.info("Starting run_create")
-    exec_query = ExecuteQuery()
-    logger.info("Created ExecuteQuery instance in run_create")
-    exec_query.run_queries_from_plan(QUERY_PLAN_CREATE)
-    logger.info("Finished run_create")
+def create_table_callable():
+    ExecuteQuery().run_queries_from_plan(
+        [
+            {
+                "function": "exec_crud",
+                "query": "example_query_3.sql",
+            }
+        ]
+    )
 
 
-def run_insert():
-    logger.info("Starting run_insert")
-    exec_query = ExecuteQuery()
-    logger.info("Created ExecuteQuery instance in run_insert")
-    exec_query.run_queries_from_plan(QUERY_PLAN_INSERT)
-    logger.info("Finished run_insert")
+def get_spark_conf():
+    eq = ExecuteQuery()
+    insert_query = open("/opt/airflow/sql/example_query_4.sql").read()
+    return eq.spark_submit_config(
+        query=insert_query,
+        tables=["test"],  # all tables referenced in your query
+        table_to_update="test",
+        mode="append",
+        update_flag=True,
+    )
 
-
-logger.info("DAG setup complete, starting to define tasks")
 
 with DAG(
     dag_id="example_exec_queries_dag",
@@ -68,30 +40,19 @@ with DAG(
     schedule=None,
     catchup=False,
     tags=["example"],
-    dagrun_timeout=timedelta(hours=1),  # <-- Add or modify this line
+    dagrun_timeout=timedelta(hours=1),
+    default_args=default_args,
 ) as dag:
-    check_pg = BashOperator(
-        task_id="check_postgres_connection",
-        bash_command=(
-            "PGPASSWORD=postgres psql -h postgres -U postgres -d postgres "
-            "-c '\\conninfo' && echo '✅ Postgres connection succeeded!'"
-        ),
-        env={
-            "POSTGRES_USER": os.environ.get("POSTGRES_USER", ""),
-            "POSTGRES_PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-            "POSTGRES_DB": os.environ.get("POSTGRES_DB", ""),
-        },
-    )
-
     t_create = PythonOperator(
         task_id="create_table",
-        python_callable=run_create,
+        python_callable=create_table_callable,
     )
-    t_insert = PythonOperator(
+
+    spark_conf = get_spark_conf()
+    t_insert = SparkSubmitOperator(
         task_id="insert_data",
-        python_callable=run_insert,
+        conn_id="spark_default",
+        **spark_conf,
     )
 
-    logger.info("Running tasks")
-
-    check_pg >> t_create >> t_insert
+    t_create >> t_insert
