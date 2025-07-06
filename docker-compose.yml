@@ -11,9 +11,11 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   airflow-webserver:
+    hostname: airflow-webserver
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
+    mem_limit: 2g
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__AUTH_MANAGER: "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager"
@@ -21,6 +23,7 @@ services:
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/simple_auth_manager_passwords.json"
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__INTERNAL_API_SECRET_KEY: ${AIRFLOW__API__SECRET_KEY}
+      AIRFLOW__API__BASE_URL: http://airflow-webserver:8080
 
     depends_on:
       - postgres
@@ -41,13 +44,17 @@ services:
       - .:/opt/airflow
 
   airflow-scheduler:
+    hostname: airflow-scheduler
+    user: root
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
+    mem_limit: 2g
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__INTERNAL_API_SECRET_KEY: ${AIRFLOW__API__SECRET_KEY}
+      AIRFLOW__API__BASE_URL: http://airflow-webserver:8080
 
     depends_on:
       - airflow-webserver
@@ -63,13 +70,16 @@ services:
       - .:/opt/airflow
 
   airflow-dag-processor:
+    hostname: airflow-dag-processor
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
+    mem_limit: 2g
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__INTERNAL_API_SECRET_KEY: ${AIRFLOW__API__SECRET_KEY}
+      AIRFLOW__API__BASE_URL: http://airflow-webserver:8080
 
     depends_on:
       - airflow-scheduler
@@ -78,6 +88,7 @@ services:
     entrypoint: /bin/bash
     command: >
       -c "
+      airflow db migrate && \
       airflow dag-processor
       "
     ports:
@@ -86,13 +97,17 @@ services:
       - .:/opt/airflow
 
   airflow-triggerer:
+    hostname: airflow-triggerer
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
+    mem_limit: 2g
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__INTERNAL_API_SECRET_KEY: ${AIRFLOW__API__SECRET_KEY}
+      AIRFLOW__API__BASE_URL: http://airflow-webserver:8080
+      PYTHONASYNCIODEBUG: 1
 
     depends_on:
       - airflow-scheduler
@@ -102,6 +117,7 @@ services:
     entrypoint: /bin/bash
     command: >
       -c "
+      airflow db migrate && \
       airflow triggerer
       "
     ports:
@@ -113,6 +129,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.spark
+    mem_limit: 2g
     environment:
       - SPARK_MODE=master
     depends_on:
@@ -125,6 +142,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.spark
+    mem_limit: 2g
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark:7077
@@ -136,6 +154,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+    mem_limit: 2g
     depends_on:
       - spark-worker
     ports:

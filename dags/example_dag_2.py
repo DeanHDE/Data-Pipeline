@@ -1,6 +1,7 @@
-from airflow.sdk import DAG
+from airflow import DAG
 from airflow.providers.standard.operators.python import PythonOperator
-from datetime import datetime
+from airflow.operators.bash import BashOperator
+from datetime import datetime, timedelta
 import sys
 import os
 import logging
@@ -14,9 +15,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 logger.info("Starting to import sys and os")
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-logger.info("Added parent directory to sys.path")
+print("Added parent directory to sys.path")
 from src.utils import ExecuteQuery
 
 logger.info("Starting to import ExecuteQuery from src.utils")
@@ -66,7 +68,21 @@ with DAG(
     schedule=None,
     catchup=False,
     tags=["example"],
+    dagrun_timeout=timedelta(hours=1),  # <-- Add or modify this line
 ) as dag:
+    check_pg = BashOperator(
+        task_id="check_postgres_connection",
+        bash_command=(
+            "PGPASSWORD=postgres psql -h postgres -U postgres -d postgres "
+            "-c '\\conninfo' && echo '✅ Postgres connection succeeded!'"
+        ),
+        env={
+            "POSTGRES_USER": os.environ.get("POSTGRES_USER", ""),
+            "POSTGRES_PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
+            "POSTGRES_DB": os.environ.get("POSTGRES_DB", ""),
+        },
+    )
+
     t_create = PythonOperator(
         task_id="create_table",
         python_callable=run_create,
@@ -78,4 +94,4 @@ with DAG(
 
     logger.info("Running tasks")
 
-    t_create >> t_insert
+    check_pg >> t_create >> t_insert

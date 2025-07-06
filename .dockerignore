@@ -25,3 +25,11 @@
 **/values.dev.yaml
 LICENSE
 README.md
+
+
+# Airflow stuff
+*.err
+*.out
+*.cfg
+/logs/
+simple_auth_manager_passwords.json*
