@@ -51,6 +51,11 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Airflow stuff
+*.err
+*.out
+*.cfg
+
 # Translations
 *.mo
 *.pot
@@ -194,3 +199,6 @@ cython_debug/
 .cursorindexingignore
 
 .github/
+
+/logs/
+simple_auth_manager_passwords.json*
