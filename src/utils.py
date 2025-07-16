@@ -1,5 +1,6 @@
 import os
 import subprocess
+from pyspark.sql import SparkSession
 import logging
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -82,6 +83,30 @@ class ExecuteQuery:
         self.spark_master = "spark://spark:7077"
         self.spark_jars = "/opt/spark/jars/postgresql-42.7.3.jar"
 
+        self.spark = (
+            SparkSession.builder.appName("PGSpark")
+            .master("spark://spark:7077")
+            .config("spark.jars", "/opt/spark/jars/postgresql-42.7.3.jar")
+            .getOrCreate()
+        )
+
+    @validate_call
+    def _load_pg_tables_to_spark(self, tables: List[str]):
+        """
+        Loads one or more PostgreSQL tables into Spark and registers them as temp views.
+        """
+        for table in tables:
+            try:
+                df = (
+                    self.spark.read.format("jdbc")
+                    .options(**self._jdbc_options(table))
+                    .load()
+                )
+                df.createOrReplaceTempView(table)
+            except Exception as e:
+                logger.info(f"Failed to load table '{table}': {e}")
+                raise
+
     @validate_call
     def _jdbc_options(self, table: str) -> dict:
         return {
@@ -107,27 +132,61 @@ class ExecuteQuery:
         df = pl.read_database(query, connection=self.conn)
         logger.info(df)
 
-    def submit_spark_job(
+    @validate_call
+    def exec_crud_spark(
         self,
-        script_path: str,
-        tables: List[str],
         query: str,
-        table_to_update: Optional[str] = None,
-        mode: Optional[str] = None,
-        update_flag: Optional[bool] = None,
-        extra_args: Optional[List[str]] = None,
+        tables: List[str],
+        update_flag: bool,
+        table_to_update: str,
+        mode: str,
     ):
         """
-        Submit a Spark job to the cluster using spark-submit.
-        Passes all relevant arguments to the Spark script.
+        Execute a SQL statement INSERT using Spark SQL.
         """
-        spark_submit_cmd = [
-            "spark-submit",
-            "--master",
-            self.spark_master,
-            "--jars",
-            self.spark_jars,
-            script_path,
+        if not query.lower().strip().startswith("insert"):
+            logger.info(
+                "Only INSERT allowed in SPARK CRUD operations. Attempted: " + query
+            )
+            raise AssertionError("Only INSERT allowed in SPARK CRUD operations.")
+
+        self._load_pg_tables_to_spark(tables)
+        self.spark.sql(query)
+        df = self.spark.sql(f"SELECT * FROM {table_to_update}")
+        df.cache()
+        df.count()  # force caching with action
+        if update_flag:
+            logger.info(
+                "Running INSERT operation in SPARK on table: " + table_to_update
+            )
+            # If update_flag is True, rewrite the DataFrame to the specified table
+            if mode == "overwrite":
+                mode = "append"
+                self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
+                self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
+
+    @validate_call
+    def exec_select_spark(self, query: str, tables: List[str]):
+        """
+        Execute a SELECT statement using Spark SQL and print the DataFrame.
+        """
+        self._load_pg_tables_to_spark(tables)
+        df = self.spark.sql(query)
+        logger.info(f"Loaded {df.count()} rows from SPARK:")
+        df.show()
+
+    @validate_call
+    def spark_submit_config(
+        self,
+        query: str,
+        tables: List[str],
+        table_to_update: str,
+        mode: str,
+        update_flag: bool,
+        extra_args: Optional[List[str]] = None,
+    ):
+        """Prepare Spark submit configuration for executing a query."""
+        application_args = [
             "--pg_url",
             self.pg_jdbc_url,
             "--pg_user",
@@ -138,68 +197,28 @@ class ExecuteQuery:
             ",".join(tables),
             "--query",
             query,
+            "--pg_table",
+            table_to_update,
+            "--mode",
+            mode,
+            "--update_flag",
+            str(update_flag),
         ]
-        if table_to_update:
-            spark_submit_cmd += ["--pg_table", table_to_update]
-        if mode:
-            spark_submit_cmd += ["--mode", mode]
-        if update_flag is not None:
-            spark_submit_cmd += ["--update_flag", str(update_flag)]
         if extra_args:
-            spark_submit_cmd.extend(extra_args)
-        logger.info(f"Submitting Spark job: {' '.join(spark_submit_cmd)}")
-        result = subprocess.run(spark_submit_cmd, capture_output=True, text=True)
-        logger.info(f"Spark job stdout:\n{result.stdout}")
-        if result.stderr:
-            logger.error(f"Spark job stderr:\n{result.stderr}")
-        if result.returncode != 0:
-            raise RuntimeError(f"Spark job failed with exit code {result.returncode}")
-
-    @validate_call
-    def exec_crud_spark(
-        self,
-        query: str,
-        tables: List[str],
-        update_flag: bool,
-        table_to_update: str,
-        mode: str,
-        spark_script: str = "/opt/airflow/dags/scripts/pg_insert_job.py",
-    ):
-        """
-        Submit a Spark job to perform an INSERT using Spark SQL.
-        All Spark logic (including loading tables) should be in the script.
-        """
-        if not query.lower().strip().startswith("insert"):
-            logger.info(
-                "Only INSERT allowed in SPARK CRUD operations. Attempted: " + query
-            )
-            raise AssertionError("Only INSERT allowed in SPARK CRUD operations.")
-
-        self.submit_spark_job(
-            script_path=spark_script,
-            tables=tables,
-            query=query,
-            table_to_update=table_to_update,
-            mode=mode,
-            update_flag=update_flag,
-        )
-
-    @validate_call
-    def exec_select_spark(
-        self,
-        query: str,
-        tables: List[str],
-        spark_script: str = "/opt/airflow/dags/scripts/pg_select_job.py",
-    ):
-        """
-        Submit a Spark job to perform a SELECT using Spark SQL.
-        All Spark logic (including loading tables) should be in the script.
-        """
-        self.submit_spark_job(
-            script_path=spark_script,
-            tables=tables,
-            query=query,
-        )
+            application_args.extend(extra_args)
+        return {
+            "application": "src/spark_job_init.py",
+            "conf": {
+                "spark.master": self.spark_master,
+                "spark.jars": self.spark_jars,
+            },
+            "jars": self.spark_jars,
+            "application_args": application_args,
+            "env_vars": {
+                "PYSPARK_PYTHON": "python3",
+                "PYSPARK_DRIVER_PYTHON": "python3",
+            },
+        }
 
     def run_queries_from_plan(self, query_plan: list):
         """

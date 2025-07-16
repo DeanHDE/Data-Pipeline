@@ -11,10 +11,10 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 RUN mkdir -p /opt/spark/jars && \
     wget -O /opt/spark/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
 
-RUN pip install --upgrade pip
+RUN pip install uv
 COPY requirements.txt .
-RUN pip install -r requirements.txt
-RUN pip install pre-commit \
+RUN uv pip install -r requirements.txt
+RUN uv pip install pre-commit \
     && pre-commit install \
     && pre-commit run --all-files || true
 

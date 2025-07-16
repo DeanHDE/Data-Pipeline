@@ -203,3 +203,4 @@ cython_debug/
 
 /logs/
 simple_auth_manager_passwords.json*
+sandbox.py

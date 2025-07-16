@@ -36,6 +36,7 @@ services:
       airflow db migrate && \
       mkdir -p /opt/airflow && \
       echo '{\"admin\": \"'${POSTGRES_PASSWORD}'\"}' > /opt/airflow/simple_auth_manager_passwords.json && \
+      (airflow connections get spark_default || airflow connections add spark_default --conn-uri 'spark://spark:7077') && \
       airflow api-server
       "
 

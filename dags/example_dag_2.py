@@ -1,8 +1,9 @@
 from airflow import DAG
-from airflow.providers.apache.spark.operators import SparkSubmitOperator
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from src.utils import ExecuteQuery
+from src.utils import ExecuteQuery, get_sql_queries_dir
+import os
 
 default_args = {
     "owner": "airflow",
@@ -22,9 +23,14 @@ def create_table_callable():
     )
 
 
+sql_queries_dir = get_sql_queries_dir()
+
+
 def get_spark_conf():
     eq = ExecuteQuery()
-    insert_query = open("/opt/airflow/sql/example_query_4.sql").read()
+    sql_dir = get_sql_queries_dir()
+    insert_query_path = os.path.join(sql_dir, "example_query_4.sql")
+    insert_query = open(insert_query_path).read()
     return eq.spark_submit_config(
         query=insert_query,
         tables=["test"],  # all tables referenced in your query
