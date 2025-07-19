@@ -4,11 +4,13 @@ USER root
 
 RUN apt-get update && apt-get install -y openjdk-17-jdk wget
 
+RUN mkdir -p /opt/airflow/jars && \
+    wget -O /opt/airflow/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+    
 ENV PATH="/opt/venv/bin:$PATH"
 ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
 ENV PATH="$JAVA_HOME/bin:$PATH"
-RUN mkdir -p /opt/airflow/jars && \
-    wget -O /opt/airflow/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+
 
 USER airflow
 

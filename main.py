@@ -70,6 +70,6 @@ def run_queries():
 
 
 if __name__ == "__main__":
-    # run_queries()
+    run_queries()
     sql.exec_select(query="SELECT * FROM test;")
     sql.exec_select_spark(query="SELECT * FROM test", tables=["test"])

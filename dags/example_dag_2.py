@@ -26,20 +26,6 @@ def create_table_callable():
 sql_queries_dir = get_sql_queries_dir()
 
 
-def get_spark_conf():
-    eq = ExecuteQuery()
-    sql_dir = get_sql_queries_dir()
-    insert_query_path = os.path.join(sql_dir, "example_query_4.sql")
-    insert_query = open(insert_query_path).read()
-    return eq.spark_submit_config(
-        query=insert_query,
-        tables=["test"],  # all tables referenced in your query
-        table_to_update="test",
-        mode="append",
-        update_flag=True,
-    )
-
-
 with DAG(
     dag_id="example_exec_queries_dag",
     start_date=datetime(2024, 1, 1),
@@ -54,11 +40,4 @@ with DAG(
         python_callable=create_table_callable,
     )
 
-    spark_conf = get_spark_conf()
-    t_insert = SparkSubmitOperator(
-        task_id="insert_data",
-        conn_id="spark_default",
-        **spark_conf,
-    )
-
-    t_create >> t_insert
+    t_create  # >> t_insert

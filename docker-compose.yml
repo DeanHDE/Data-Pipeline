@@ -141,8 +141,15 @@ services:
     depends_on:
       - airflow-triggerer
     ports:
-      - "8077:8077" # Spark UI
       - "7077:7077" # Spark master port
+    command:
+      [
+        "/opt/bitnami/spark/bin/spark-class",
+        "org.apache.spark.deploy.master.Master",
+        "--webui-port",
+        "8077",
+      ]
+    # change webui-port to 8077 to avoid conflict with Airflow webserver
 
   spark-worker:
     build:

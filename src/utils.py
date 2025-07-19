@@ -10,6 +10,7 @@ import psycopg2
 import polars as pl
 from src.settings import get_sql_queries_dir
 
+
 load_dotenv()
 
 logging.basicConfig(
@@ -81,12 +82,12 @@ class ExecuteQuery:
             "driver": "org.postgresql.Driver",
         }
         self.spark_master = "spark://spark:7077"
-        self.spark_jars = "/opt/spark/jars/postgresql-42.7.3.jar"
+        self.spark_jars = "/opt/airflow/jars/postgresql-42.7.3.jar"
 
         self.spark = (
             SparkSession.builder.appName("PGSpark")
             .master("spark://spark:7077")
-            .config("spark.jars", "/opt/spark/jars/postgresql-42.7.3.jar")
+            .config("spark.jars", "/opt/bitnami/spark/jars/postgresql-42.7.3.jar")
             .getOrCreate()
         )
 
@@ -131,6 +132,14 @@ class ExecuteQuery:
         logger.info(f"SELECTING table from postgres directly using polars df: {query}")
         df = pl.read_database(query, connection=self.conn)
         logger.info(df)
+
+    @validate_call
+    def write_spark_df_to_pg(self, df, table: str, mode: str):
+        """
+        Write a single Spark DataFrame to a PostgreSQL table using JDBC.
+        mode: "append", "overwrite", "ignore", or "error"
+        """
+        df.write.format("jdbc").options(**self._jdbc_options(table)).mode(mode).save()
 
     @validate_call
     def exec_crud_spark(
@@ -207,7 +216,7 @@ class ExecuteQuery:
         if extra_args:
             application_args.extend(extra_args)
         return {
-            "application": "src/spark_job_init.py",
+            # "application": "../spark_job_init.py",
             "conf": {
                 "spark.master": self.spark_master,
                 "spark.jars": self.spark_jars,

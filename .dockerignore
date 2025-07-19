@@ -33,3 +33,4 @@ README.md
 *.cfg
 /logs/
 simple_auth_manager_passwords.json*
+sandbox.py

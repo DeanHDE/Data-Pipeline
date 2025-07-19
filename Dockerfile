@@ -8,8 +8,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
 ENV PATH="$JAVA_HOME/bin:$PATH"
-RUN mkdir -p /opt/spark/jars && \
-    wget -O /opt/spark/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+RUN mkdir -p /opt/bitnami/spark/jars && \
+    wget -O /opt/bitnami/spark/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
 
 RUN pip install uv
 COPY requirements.txt .
