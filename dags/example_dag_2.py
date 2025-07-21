@@ -45,7 +45,7 @@ with DAG(
         tables=["your_table"],  # Replace with actual table(s) needed for the query
         table_to_update="your_table",  # Replace with the table being inserted into
         mode="append",
-        update_flag=False,
+        update_flag=True,
     )
 
     t_insert = SparkSubmitOperator(
