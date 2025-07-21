@@ -216,7 +216,7 @@ class ExecuteQuery:
         if extra_args:
             application_args.extend(extra_args)
         return {
-            # "application": "../spark_job_init.py",
+            "application": "/src/spark_job_init.py",
             "conf": {
                 "spark.master": self.spark_master,
                 "spark.jars": self.spark_jars,

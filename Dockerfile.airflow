@@ -4,9 +4,13 @@ USER root
 
 RUN apt-get update && apt-get install -y openjdk-17-jdk wget
 
-RUN mkdir -p /opt/airflow/jars && \
-    wget -O /opt/airflow/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
-    
+
+RUN mkdir -p /opt/bitnami/spark/jars
+RUN wget -O /opt/bitnami/spark/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+
+RUN mkdir -p /opt/airflow/jars
+RUN wget -O /opt/airflow/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+
 ENV PATH="/opt/venv/bin:$PATH"
 ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
 ENV PATH="$JAVA_HOME/bin:$PATH"
@@ -18,7 +22,12 @@ COPY requirements.txt /requirements.txt
 RUN pip install uv
 COPY requirements.txt .
 RUN uv pip install -r requirements.txt
-RUN uv pip install apache-airflow-providers-apache-spark
-   # Airflow provider for Spark
+RUN uv pip install apache-airflow-providers-apache-spark==3.0.0
+   # Airflow provider for Spark, enforce match with Spark service images
+   
+
+
+
 
 USER airflow
+
