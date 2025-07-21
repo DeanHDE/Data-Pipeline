@@ -82,7 +82,7 @@ class ExecuteQuery:
             "driver": "org.postgresql.Driver",
         }
         self.spark_master = "spark://spark:7077"
-        self.spark_jars = "/opt/airflow/jars/postgresql-42.7.3.jar"
+        self.spark_jars = "/opt/bitnami/spark/jars/postgresql-42.7.3.jar"
 
         self.spark = (
             SparkSession.builder.appName("PGSpark")
@@ -216,7 +216,7 @@ class ExecuteQuery:
         if extra_args:
             application_args.extend(extra_args)
         return {
-            "application": "/src/spark_job_init.py",
+            "application": "/opt/airflow/src/spark_job_init.py",
             "conf": {
                 "spark.master": self.spark_master,
                 "spark.jars": self.spark_jars,
@@ -228,6 +228,16 @@ class ExecuteQuery:
                 "PYSPARK_DRIVER_PYTHON": "python3",
             },
         }
+
+        if update_flag:
+            logger.info(
+                "Running INSERT operation in SPARK on table: " + table_to_update
+            )
+            # If update_flag is True, rewrite the DataFrame to the specified table
+            if mode == "overwrite":
+                mode = "append"
+                self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
+                self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
 
     def run_queries_from_plan(self, query_plan: list):
         """
