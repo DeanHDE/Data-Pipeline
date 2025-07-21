@@ -1,22 +1,31 @@
 import os
-import requests
-import psycopg2
+import subprocess
+from pyspark.sql import SparkSession
 import logging
-import polars as pl
-from typing import List
+from typing import List, Optional
 from dotenv import load_dotenv
 from functools import wraps
-from pyspark.sql import SparkSession
 from pydantic import validate_call
+import psycopg2
+import polars as pl
 from src.settings import get_sql_queries_dir
 
 
 load_dotenv()
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[
+        logging.FileHandler("app.log"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
+
 
 def check_env_vars() -> None:
     """Check if the required environment variables for PostgreSQL are set."""
-
     REQUIRED = {
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
@@ -27,7 +36,9 @@ def check_env_vars() -> None:
     env_path = os.path.abspath(env_path)
 
     if not os.path.isfile(env_path):
-        logger.info(f"❌ .env file not found at {env_path} or variables not set.")
+        logger.info(
+            f"❌ .env file not found at {env_path} or one of variables {', '.join(REQUIRED)} not set."
+        )
         return
 
     with open(env_path) as f:
@@ -41,19 +52,11 @@ def check_env_vars() -> None:
     missing = REQUIRED - found
 
     if missing:
+        logger.info(f"❌ Missing environment variables: {', '.join(missing)}")
         return
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    handlers=[
-        logging.FileHandler("app.log"),
-        logging.StreamHandler(),  # This keeps logging to terminal as well
-    ],
-)
-logger = logging.getLogger(__name__)
-
+check_env_vars()
 
 pg_user = os.environ.get("POSTGRES_USER")
 pg_password = os.environ.get("POSTGRES_PASSWORD")
@@ -61,9 +64,7 @@ pg_database = os.environ.get("POSTGRES_DB")
 
 
 class ExecuteQuery:
-    """A class to execute a SQL query using psycopg2 and return the results."""
-
-    check_env_vars()
+    """A class to execute SQL queries using psycopg2, polars, or by submitting Spark jobs."""
 
     def __init__(self):
         self.conn = psycopg2.connect(
@@ -73,47 +74,22 @@ class ExecuteQuery:
             password=pg_password,
             dbname=pg_database,
         )
-        self.spark = (
-            SparkSession.builder.appName("PGSpark")
-            .master("spark://spark:7077")
-            .config("spark.jars", "/opt/spark/jars/postgresql-42.7.3.jar")
-            .getOrCreate()
-        )
-
         # JDBC config for PG
-        self.pg_jdbc_url = "jdbc:postgresql://postgres:5432/postgres"
+        self.pg_jdbc_url = f"jdbc:postgresql://postgres:5432/postgres"
         self.pg_jdbc_props = {
             "user": pg_user,
             "password": pg_password,
             "driver": "org.postgresql.Driver",
         }
+        self.spark_master = "spark://spark:7077"
+        self.spark_jars = "/opt/bitnami/spark/jars/postgresql-42.7.3.jar"
 
-    @validate_call
-    def _jdbc_options(self, table: str) -> dict:
-        return {
-            "url": self.pg_jdbc_url,
-            "dbtable": table,
-            "user": self.pg_jdbc_props["user"],
-            "password": self.pg_jdbc_props["password"],
-            "driver": self.pg_jdbc_props["driver"],
-        }
-
-    @validate_call
-    def exec_crud(self, query: str):
-        conn = self.conn
-        with conn.cursor() as cur:
-            logger.info(f"Executing query in postgres directly: {query}")
-            cur.execute(query)
-            conn.commit()
-
-    @validate_call
-    def exec_select(self, query: str):
-        conn = self.conn
-        logger.info(f"SELECTING table from postgres directly using polars df: {query}")
-        df = pl.read_database(query, connection=conn)
-        logger.info(df)
-
-    # --- Spark versions below ---
+        self.spark = (
+            SparkSession.builder.appName("PGSpark")
+            .master("spark://spark:7077")
+            .config("spark.jars", "/opt/bitnami/spark/jars/postgresql-42.7.3.jar")
+            .getOrCreate()
+        )
 
     @validate_call
     def _load_pg_tables_to_spark(self, tables: List[str]):
@@ -131,6 +107,31 @@ class ExecuteQuery:
             except Exception as e:
                 logger.info(f"Failed to load table '{table}': {e}")
                 raise
+
+    @validate_call
+    def _jdbc_options(self, table: str) -> dict:
+        return {
+            "url": self.pg_jdbc_url,
+            "dbtable": table,
+            "user": self.pg_jdbc_props["user"],
+            "password": self.pg_jdbc_props["password"],
+            "driver": self.pg_jdbc_props["driver"],
+        }
+
+    @validate_call
+    def exec_crud(self, query: str):
+        """Execute a SQL statement (INSERT/UPDATE/DELETE) in Postgres directly."""
+        with self.conn.cursor() as cur:
+            logger.info(f"Executing query in postgres directly: {query}")
+            cur.execute(query)
+            self.conn.commit()
+
+    @validate_call
+    def exec_select(self, query: str):
+        """Execute a SELECT statement in Postgres and print the result as a Polars DataFrame."""
+        logger.info(f"SELECTING table from postgres directly using polars df: {query}")
+        df = pl.read_database(query, connection=self.conn)
+        logger.info(df)
 
     @validate_call
     def write_spark_df_to_pg(self, df, table: str, mode: str):
@@ -183,6 +184,61 @@ class ExecuteQuery:
         logger.info(f"Loaded {df.count()} rows from SPARK:")
         df.show()
 
+    @validate_call
+    def spark_submit_config(
+        self,
+        query: str,
+        tables: List[str],
+        table_to_update: str,
+        mode: str,
+        update_flag: bool,
+        extra_args: Optional[List[str]] = None,
+    ):
+        """Prepare Spark submit configuration for executing a query."""
+        application_args = [
+            "--pg_url",
+            self.pg_jdbc_url,
+            "--pg_user",
+            self.pg_jdbc_props["user"],
+            "--pg_password",
+            self.pg_jdbc_props["password"],
+            "--tables",
+            ",".join(tables),
+            "--query",
+            query,
+            "--pg_table",
+            table_to_update,
+            "--mode",
+            mode,
+            "--update_flag",
+            str(update_flag),
+        ]
+        if extra_args:
+            application_args.extend(extra_args)
+        return {
+            "application": "/opt/airflow/src/spark_job_init.py",
+            "conf": {
+                "spark.master": self.spark_master,
+                "spark.jars": self.spark_jars,
+            },
+            "jars": self.spark_jars,
+            "application_args": application_args,
+            "env_vars": {
+                "PYSPARK_PYTHON": "python3",
+                "PYSPARK_DRIVER_PYTHON": "python3",
+            },
+        }
+
+        if update_flag:
+            logger.info(
+                "Running INSERT operation in SPARK on table: " + table_to_update
+            )
+            # If update_flag is True, rewrite the DataFrame to the specified table
+            if mode == "overwrite":
+                mode = "append"
+                self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
+                self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
+
     def run_queries_from_plan(self, query_plan: list):
         """
         query_plan: List of dicts, each with:
@@ -192,7 +248,6 @@ class ExecuteQuery:
         """
         sql = ExecuteQuery()
         sql_queries_dir = get_sql_queries_dir()
-        print(f"SQL queries directory: {sql_queries_dir}")
 
         for step in query_plan:
             func_name = step["function"]

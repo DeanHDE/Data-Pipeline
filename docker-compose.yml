@@ -1,6 +1,8 @@
 services:
   postgres:
+    hostname: postgres
     image: postgres:16
+    restart: on-failure:3
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -15,6 +17,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
+    restart: on-failure:3
     mem_limit: 2g
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -33,19 +36,19 @@ services:
       airflow db migrate && \
       mkdir -p /opt/airflow && \
       echo '{\"admin\": \"'${POSTGRES_PASSWORD}'\"}' > /opt/airflow/simple_auth_manager_passwords.json && \
+      (airflow connections get spark_default || airflow connections add spark_default --conn-uri 'spark://spark:7077') && \
       airflow api-server
       "
 
     ports:
       - "8080:8080"
 
-    restart: on-failure
     volumes:
       - .:/opt/airflow
 
   airflow-scheduler:
     hostname: airflow-scheduler
-    user: root
+    restart: on-failure:3
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
@@ -74,6 +77,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
+    restart: on-failure:3
     mem_limit: 2g
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -101,6 +105,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.airflow
+    restart: on-failure:3
     mem_limit: 2g
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -129,19 +134,28 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.spark
+    restart: on-failure:3
     mem_limit: 2g
     environment:
       - SPARK_MODE=master
     depends_on:
       - airflow-triggerer
     ports:
-      - "8077:8077" # Spark UI
       - "7077:7077" # Spark master port
+    command:
+      [
+        "/opt/bitnami/spark/bin/spark-class",
+        "org.apache.spark.deploy.master.Master",
+        "--webui-port",
+        "8077",
+      ]
+    # change webui-port to 8077 to avoid conflict with Airflow webserver
 
   spark-worker:
     build:
       context: .
       dockerfile: ./Dockerfile.spark
+    restart: on-failure:3
     mem_limit: 2g
     environment:
       - SPARK_MODE=worker
@@ -154,6 +168,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+    restart: on-failure:3
     mem_limit: 2g
     depends_on:
       - spark-worker

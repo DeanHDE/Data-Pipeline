@@ -1,18 +1,33 @@
 FROM apache/airflow:3.0.1-python3.12
 
+USER root
+
+RUN apt-get update && apt-get install -y openjdk-17-jdk wget
+
+
+RUN mkdir -p /opt/bitnami/spark/jars
+RUN wget -O /opt/bitnami/spark/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+
+RUN mkdir -p /opt/airflow/jars
+RUN wget -O /opt/airflow/jars/postgresql-42.7.3.jar https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+
+ENV PATH="/opt/venv/bin:$PATH"
+ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
+ENV PATH="$JAVA_HOME/bin:$PATH"
+
+
 USER airflow
 
 COPY requirements.txt /requirements.txt
-RUN pip install --upgrade pip
+RUN pip install uv
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN uv pip install -r requirements.txt
+RUN uv pip install apache-airflow-providers-apache-spark==3.0.0
+   # Airflow provider for Spark, enforce match with Spark service images
+   
 
-USER root
-RUN apt-get update && apt-get install -y wget
 
-USER 1001
 
-RUN apt-get update && apt-get install -y openjdk-17-jre-headless procps && rm -rf /var/lib/apt/lists/*
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
 USER airflow
+
