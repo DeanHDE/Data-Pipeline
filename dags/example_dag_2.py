@@ -13,7 +13,7 @@ default_args = {
 
 
 def create_table_callable():
-    ExecuteQuery().run_queries_from_plan(
+    ExecuteQuery(app_name="PGAppCreateExample").run_queries_from_plan(
         [
             {
                 "function": "exec_crud",
@@ -23,7 +23,20 @@ def create_table_callable():
     )
 
 
-sql_queries_dir = get_sql_queries_dir()
+def insert_table_2_callable():
+    ExecuteQuery(app_name="PGAppInsertExample").run_queries_from_plan(
+        [
+            {
+                "function": "exec_crud_spark",
+                "query": "example_query_4.sql",
+                "tables": ["test"],
+                "update_flag": True,
+                "table_to_update": "test",
+                "mode": "append",
+            }
+        ]
+    )
+
 
 with DAG(
     dag_id="example_exec_queries_dag",
@@ -39,22 +52,19 @@ with DAG(
         python_callable=create_table_callable,
     )
 
-    # Use utils.py to generate Spark config for the insert
-    spark_conf = ExecuteQuery().spark_submit_config(
-        query=open(os.path.join(sql_queries_dir, "example_query_4.sql")).read(),
-        tables=["your_table"],  # Replace with actual table(s) needed for the query
-        table_to_update="your_table",  # Replace with the table being inserted into
-        mode="append",
-        update_flag=True,
-    )
-
-    t_insert = SparkSubmitOperator(
+    """t_insert = SparkSubmitOperator(
         task_id="insert_table",
         application=spark_conf["application"],
         conf=spark_conf["conf"],
         jars=spark_conf["jars"],
+        query=spark_conf["application_args"][3],  # query is the SQL string
         application_args=spark_conf["application_args"],
         env_vars=spark_conf["env_vars"],
+    )"""
+
+    t_insert = PythonOperator(
+        task_id="insert_table",
+        python_callable=insert_table_2_callable,
     )
 
     t_create >> t_insert

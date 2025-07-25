@@ -140,8 +140,9 @@ services:
       - SPARK_MODE=master
     depends_on:
       - airflow-triggerer
-    ports:
+    ports: # expose the ports in earnest
       - "7077:7077" # Spark master port
+      - "8077:8077" # Spark master web UI port
     command:
       [
         "/opt/bitnami/spark/bin/spark-class",
