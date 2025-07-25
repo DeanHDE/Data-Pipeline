@@ -205,7 +205,7 @@ class ExecuteQuery:
         - "query": SQL filename (str) or SQL string
         - ...other kwargs for the method (optional)
         """
-        sql = ExecuteQuery()
+        sql = self
         sql_queries_dir = get_sql_queries_dir()
 
         for step in query_plan:

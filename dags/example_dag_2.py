@@ -52,16 +52,6 @@ with DAG(
         python_callable=create_table_callable,
     )
 
-    """t_insert = SparkSubmitOperator(
-        task_id="insert_table",
-        application=spark_conf["application"],
-        conf=spark_conf["conf"],
-        jars=spark_conf["jars"],
-        query=spark_conf["application_args"][3],  # query is the SQL string
-        application_args=spark_conf["application_args"],
-        env_vars=spark_conf["env_vars"],
-    )"""
-
     t_insert = PythonOperator(
         task_id="insert_table",
         python_callable=insert_table_2_callable,
