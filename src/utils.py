@@ -1,5 +1,4 @@
 import os
-import subprocess
 from pyspark.sql import SparkSession
 import logging
 from typing import List, Optional
@@ -66,7 +65,7 @@ pg_database = os.environ.get("POSTGRES_DB")
 class ExecuteQuery:
     """A class to execute SQL queries using psycopg2, polars, or by submitting Spark jobs."""
 
-    def __init__(self):
+    def __init__(self, app_name: str = "PGAppDefault"):
         self.conn = psycopg2.connect(
             host="postgres",
             port=5432,
@@ -85,7 +84,7 @@ class ExecuteQuery:
         self.spark_jars = "/opt/bitnami/spark/jars/postgresql-42.7.3.jar"
 
         self.spark = (
-            SparkSession.builder.appName("PGSpark")
+            SparkSession.builder.appName(app_name)
             .master("spark://spark:7077")
             .config("spark.jars", "/opt/bitnami/spark/jars/postgresql-42.7.3.jar")
             .getOrCreate()
@@ -134,11 +133,26 @@ class ExecuteQuery:
         logger.info(df)
 
     @validate_call
-    def write_spark_df_to_pg(self, df, table: str, mode: str):
+    def _write_spark_df_to_pg(self, df, table: str, mode: str):
         """
         Write a single Spark DataFrame to a PostgreSQL table using JDBC.
         mode: "append", "overwrite", "ignore", or "error"
         """
+        df.write.format("jdbc").options(**self._jdbc_options(table)).mode(mode).save()
+
+    @validate_call
+    def write_spark_table_to_pg(self, table: str, mode: str):
+        """
+        Write a single Spark DataFrame to a PostgreSQL table using JDBC.
+        mode: "append", "overwrite", "ignore", or "error"
+        """
+        self._load_pg_tables_to_spark([table])
+        df = self.spark.sql(f"SELECT * FROM {table}")
+        df.cache()
+        df.count()  # force caching with action
+        logger.info(
+            f"Writing Spark DataFrame to PostgreSQL table: {table} with mode: {mode}"
+        )
         df.write.format("jdbc").options(**self._jdbc_options(table)).mode(mode).save()
 
     @validate_call
@@ -172,7 +186,7 @@ class ExecuteQuery:
             if mode == "overwrite":
                 mode = "append"
                 self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
-                self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
+                self._write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
 
     @validate_call
     def exec_select_spark(self, query: str, tables: List[str]):
@@ -184,61 +198,6 @@ class ExecuteQuery:
         logger.info(f"Loaded {df.count()} rows from SPARK:")
         df.show()
 
-    @validate_call
-    def spark_submit_config(
-        self,
-        query: str,
-        tables: List[str],
-        table_to_update: str,
-        mode: str,
-        update_flag: bool,
-        extra_args: Optional[List[str]] = None,
-    ):
-        """Prepare Spark submit configuration for executing a query."""
-        application_args = [
-            "--pg_url",
-            self.pg_jdbc_url,
-            "--pg_user",
-            self.pg_jdbc_props["user"],
-            "--pg_password",
-            self.pg_jdbc_props["password"],
-            "--tables",
-            ",".join(tables),
-            "--query",
-            query,
-            "--pg_table",
-            table_to_update,
-            "--mode",
-            mode,
-            "--update_flag",
-            str(update_flag),
-        ]
-        if extra_args:
-            application_args.extend(extra_args)
-        return {
-            "application": "/opt/airflow/src/spark_job_init.py",
-            "conf": {
-                "spark.master": self.spark_master,
-                "spark.jars": self.spark_jars,
-            },
-            "jars": self.spark_jars,
-            "application_args": application_args,
-            "env_vars": {
-                "PYSPARK_PYTHON": "python3",
-                "PYSPARK_DRIVER_PYTHON": "python3",
-            },
-        }
-
-        if update_flag:
-            logger.info(
-                "Running INSERT operation in SPARK on table: " + table_to_update
-            )
-            # If update_flag is True, rewrite the DataFrame to the specified table
-            if mode == "overwrite":
-                mode = "append"
-                self.exec_crud(query=f"TRUNCATE TABLE {table_to_update};")
-                self.write_spark_df_to_pg(df=df, table=table_to_update, mode=mode)
-
     def run_queries_from_plan(self, query_plan: list):
         """
         query_plan: List of dicts, each with:
@@ -246,12 +205,13 @@ class ExecuteQuery:
         - "query": SQL filename (str) or SQL string
         - ...other kwargs for the method (optional)
         """
-        sql = ExecuteQuery()
+        sql = self
         sql_queries_dir = get_sql_queries_dir()
 
         for step in query_plan:
             func_name = step["function"]
             query = step["query"]
+
             # If query is a filename, load its contents
             if (
                 isinstance(query, str)
